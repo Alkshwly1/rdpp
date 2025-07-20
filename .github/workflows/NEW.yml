@@ -1,52 +1,65 @@
-name: Auto RDP Test Every 30 Seconds
+name: Auto RDP Test Every 30 Seconds with ngrok v3 + Discord Embed
 
 on:
   schedule:
-    - cron: '*/1 * * * *'  # تشغيل كل دقيقة
+    - cron: '*/1 * * * *'  # تشغيل كل دقيقة (GitHub لا يسمح بأقل من دقيقة)
   workflow_dispatch:
 
 jobs:
   build:
+
     runs-on: windows-latest
-    timeout-minutes: 10
+    timeout-minutes: 10  # جلسة قصيرة للاختبار
 
     steps:
-    - name: Notify Discord - Starting RDP
+    - name: Notify Discord - Embed Start
       run: |
-        $Payload = @{ content = "🚀 بدء جلسة RDP اختبارية الآن (loop.ps1 يجدد كل 30 ثانية)." }
-        Invoke-RestMethod -Uri "https://discord.com/api/webhooks/1396598545611624448/1knf6aOC9Bpe1LiSoMoph4E2ik7dqwBsxXa4-GSRIocKkknq0fnVuG9WUxBt-2zgN51j" -Method Post -Body ($Payload | ConvertTo-Json) -ContentType 'application/json'
+        $Payload = @{
+          embeds = @(@{
+            title = "🚀 بدء جلسة RDP"
+            description = "تم تشغيل الجلسة تلقائيًا من GitHub Actions"
+            color = 65280
+            fields = @(
+              @{ name = "نوع الجلسة"; value = "اختبارية كل 30 ثانية"; inline = $true },
+              @{ name = "المصدر"; value = "loop.ps1"; inline = $true },
+              @{ name = "الوقت"; value = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" }
+            )
+            footer = @{ text = "Copilot شغّلك الجلسة 😎" }
+          })
+        }
+        Invoke-RestMethod -Uri "https://discord.com/api/webhooks/1396598545611624448/1knf6aOC9Bpe1LiSoMoph4E2ik7dqwBsxXa4-GSRIocKkknq0fnVuG9WUxBt-2zgN51j" -Method Post -Body ($Payload | ConvertTo-Json -Depth 10) -ContentType 'application/json'
 
-    - name: Downloading Ngrok and Resources
-      run: |
-        Invoke-WebRequest https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-windows-amd64.zip -OutFile ngrok.zip
-        Invoke-WebRequest https://raw.githubusercontent.com/30dayscoding/rdp/main/start.bat -OutFile start.bat
-        Invoke-WebRequest https://raw.githubusercontent.com/30dayscoding/rdp/main/wallpaper.jpg -OutFile wallpaper.jpg
-        Invoke-WebRequest https://raw.githubusercontent.com/30dayscoding/rdp/main/wallpaper.bat -OutFile wallpaper.bat
+    - name: Download ngrok v3
+      run: Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.zip
 
-    - name: Extracting Ngrok Files
-      run: |
-        Expand-Archive ngrok.zip -DestinationPath ngrok
+    - name: Extract ngrok
+      run: Expand-Archive ngrok.zip
 
-    - name: Connecting to your Ngrok account
+    - name: Authenticate ngrok
       run: .\ngrok\ngrok.exe authtoken $Env:NGROK_AUTH_TOKEN
       env:
         NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
 
-    - name: Enabling RDP access
-      run: | 
+    - name: Enable RDP access
+      run: |
         Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
         Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
         Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 1
-        copy wallpaper.jpg D:\a\wallpaper.jpg
-        copy wallpaper.bat D:\a\wallpaper.bat
+        Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "P@ssw0rd!" -Force)
 
-    - name: Creating ngrok Tunnel
+    - name: Create ngrok Tunnel
       run: Start-Process Powershell -ArgumentList '-Noexit -Command ".\ngrok\ngrok.exe tcp 3389"'
 
-    - name: Starting RDP with Configuration
+    - name: Download Resources
+      run: |
+        Invoke-WebRequest https://raw.githubusercontent.com/30dayscoding/rdp/main/start.bat -OutFile start.bat
+        Invoke-WebRequest https://raw.githubusercontent.com/30dayscoding/rdp/main/wallpaper.jpg -OutFile wallpaper.jpg
+        Invoke-WebRequest https://raw.githubusercontent.com/30dayscoding/rdp/main/wallpaper.bat -OutFile wallpaper.bat
+
+    - name: Apply Session Setup
       run: cmd /c start.bat
 
-    - name: Run loop.ps1 for 30s refresh and backup
+    - name: Start loop.ps1 (30s Refresh + Backup + Discord Notify)
       run: |
         Invoke-WebRequest https://raw.githubusercontent.com/30dayscoding/rdp/main/loop.ps1 -OutFile loop.ps1
         ./loop.ps1
