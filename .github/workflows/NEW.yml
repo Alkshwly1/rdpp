@@ -1,38 +1,52 @@
-name: FreeRDP
+name: Auto RDP Test Every 30 Seconds
 
-on: workflow_dispatch
+on:
+  schedule:
+    - cron: '*/1 * * * *'  # تشغيل كل دقيقة (أقصى تكرار مسموح من GitHub)
+  workflow_dispatch:
 
 jobs:
   build:
 
     runs-on: windows-latest
-    timeout-minutes: 9999
+    timeout-minutes: 10  # وقت الجلسة قصير للتجربة
 
     steps:
-    - name: Downloading Ngrok.
+    - name: Notify Discord - Starting RDP
       run: |
-        Invoke-WebRequest https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-windows-amd64.zip -OutFile ngrok.zip
+        $Payload = @{ content = "🚀 بدء جلسة RDP اختبارية الآن (كل 30 ثانية من داخل loop.ps1)!" }
+        Invoke-RestMethod -Uri "https://discord.com/api/webhooks/1396598545611624448/1knf6aOC9Bpe1LiSoMoph4E2ik7dqwBsxXa4-GSRIocKkknq0fnVuG9WUxBt-2zgN51j" -Method Post -Body ($Payload | ConvertTo-Json) -ContentType 'application/json'
+
+    - name: Downloading Ngrok and Resources
+      run: |
+        Invoke-WebRequest https://download.ngrok.com/ngrok.zip -OutFile ngrok.zip
         Invoke-WebRequest https://raw.githubusercontent.com/30dayscoding/rdp/main/start.bat -OutFile start.bat
         Invoke-WebRequest https://raw.githubusercontent.com/30dayscoding/rdp/main/wallpaper.jpg -OutFile wallpaper.jpg
         Invoke-WebRequest https://raw.githubusercontent.com/30dayscoding/rdp/main/wallpaper.bat -OutFile wallpaper.bat
-    - name: Extracting Ngrok Files.
+
+    - name: Extracting Ngrok
       run: Expand-Archive ngrok.zip
-    - name: Connecting to your Ngrok account.
+
+    - name: Connecting Ngrok Account
       run: .\ngrok\ngrok.exe authtoken $Env:NGROK_AUTH_TOKEN
       env:
         NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
-    - name: Activating RDP access.
+
+    - name: Enabling RDP
       run: | 
-        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server'-name "fDenyTSConnections" -Value 0
+        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
         Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
-        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -Value 1
+        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 1
         copy wallpaper.jpg D:\a\wallpaper.jpg
         copy wallpaper.bat D:\a\wallpaper.bat
-    - name: Creating Tunnel.
+
+    - name: Launching ngrok Tunnel
       run: Start-Process Powershell -ArgumentList '-Noexit -Command ".\ngrok\ngrok.exe tcp 3389"'
-    - name: Connecting to your RDP.
+
+    - name: Starting RDP and Setup
       run: cmd /c start.bat
-    - name: RDP is ready!
-      run: | 
-        Invoke-WebRequest https://github.com/30dayscoding/rdp/raw/main/loop.ps1 -OutFile loop.ps1
+
+    - name: Session Loop + Backup + Discord Notify
+      run: |
+        Invoke-WebRequest https://raw.githubusercontent.com/30dayscoding/rdp/main/loop.ps1 -OutFile loop.ps1
         ./loop.ps1
