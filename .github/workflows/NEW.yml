@@ -2,14 +2,13 @@ name: Auto RDP Test Every 30 Seconds
 
 on:
   schedule:
-    - cron: '*/1 * * * *'  # تشغيل كل دقيقة (اختبار مكثف)
+    - cron: '*/1 * * * *'  # تشغيل كل دقيقة
   workflow_dispatch:
 
 jobs:
   build:
-
     runs-on: windows-latest
-    timeout-minutes: 10  # جلسة قصيرة للاختبار
+    timeout-minutes: 10
 
     steps:
     - name: Notify Discord - Starting RDP
@@ -25,7 +24,8 @@ jobs:
         Invoke-WebRequest https://raw.githubusercontent.com/30dayscoding/rdp/main/wallpaper.bat -OutFile wallpaper.bat
 
     - name: Extracting Ngrok Files
-      run: Expand-Archive ngrok.zip
+      run: |
+        Expand-Archive ngrok.zip -DestinationPath ngrok
 
     - name: Connecting to your Ngrok account
       run: .\ngrok\ngrok.exe authtoken $Env:NGROK_AUTH_TOKEN
