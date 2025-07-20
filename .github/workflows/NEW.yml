@@ -2,37 +2,37 @@ name: Auto RDP Test Every 30 Seconds
 
 on:
   schedule:
-    - cron: '*/1 * * * *'  # تشغيل كل دقيقة (أقصى تكرار مسموح من GitHub)
+    - cron: '*/1 * * * *'  # تشغيل كل دقيقة (اختبار مكثف)
   workflow_dispatch:
 
 jobs:
   build:
 
     runs-on: windows-latest
-    timeout-minutes: 10  # وقت الجلسة قصير للتجربة
+    timeout-minutes: 10  # جلسة قصيرة للاختبار
 
     steps:
     - name: Notify Discord - Starting RDP
       run: |
-        $Payload = @{ content = "🚀 بدء جلسة RDP اختبارية الآن (كل 30 ثانية من داخل loop.ps1)!" }
+        $Payload = @{ content = "🚀 بدء جلسة RDP اختبارية الآن (loop.ps1 يجدد كل 30 ثانية)." }
         Invoke-RestMethod -Uri "https://discord.com/api/webhooks/1396598545611624448/1knf6aOC9Bpe1LiSoMoph4E2ik7dqwBsxXa4-GSRIocKkknq0fnVuG9WUxBt-2zgN51j" -Method Post -Body ($Payload | ConvertTo-Json) -ContentType 'application/json'
 
     - name: Downloading Ngrok and Resources
       run: |
-        Invoke-WebRequest https://download.ngrok.com/ngrok.zip -OutFile ngrok.zip
+        Invoke-WebRequest https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-windows-amd64.zip -OutFile ngrok.zip
         Invoke-WebRequest https://raw.githubusercontent.com/30dayscoding/rdp/main/start.bat -OutFile start.bat
         Invoke-WebRequest https://raw.githubusercontent.com/30dayscoding/rdp/main/wallpaper.jpg -OutFile wallpaper.jpg
         Invoke-WebRequest https://raw.githubusercontent.com/30dayscoding/rdp/main/wallpaper.bat -OutFile wallpaper.bat
 
-    - name: Extracting Ngrok
+    - name: Extracting Ngrok Files
       run: Expand-Archive ngrok.zip
 
-    - name: Connecting Ngrok Account
+    - name: Connecting to your Ngrok account
       run: .\ngrok\ngrok.exe authtoken $Env:NGROK_AUTH_TOKEN
       env:
         NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
 
-    - name: Enabling RDP
+    - name: Enabling RDP access
       run: | 
         Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
         Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
@@ -40,13 +40,13 @@ jobs:
         copy wallpaper.jpg D:\a\wallpaper.jpg
         copy wallpaper.bat D:\a\wallpaper.bat
 
-    - name: Launching ngrok Tunnel
+    - name: Creating ngrok Tunnel
       run: Start-Process Powershell -ArgumentList '-Noexit -Command ".\ngrok\ngrok.exe tcp 3389"'
 
-    - name: Starting RDP and Setup
+    - name: Starting RDP with Configuration
       run: cmd /c start.bat
 
-    - name: Session Loop + Backup + Discord Notify
+    - name: Run loop.ps1 for 30s refresh and backup
       run: |
         Invoke-WebRequest https://raw.githubusercontent.com/30dayscoding/rdp/main/loop.ps1 -OutFile loop.ps1
         ./loop.ps1
